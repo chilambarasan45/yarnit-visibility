@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: yarnit_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: yarnit
+    ports:
+      - "5432:5432"
+    volumes:
+      - yarnit_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: .
+    container_name: yarnit_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Overrides the DATABASE_URL from .env so the backend connects to
+      # the "postgres" service name (Docker's internal DNS), not
+      # "localhost" -- localhost inside a container means the container
+      # itself, not the host machine or the postgres container.
+      DATABASE_URL: postgresql://postgres:admin123@postgres:5432/yarnit
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../frontend.Dockerfile
+      args:
+        # Must match API_SECRET_KEY in the backend's .env exactly, or
+        # every request from the frontend will be rejected with 401.
+        REACT_APP_API_KEY: ${API_SECRET_KEY}
+    container_name: yarnit_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+
+volumes:
+  yarnit_pg_data:

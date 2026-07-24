@@ -661,8 +661,71 @@ def construct_prompts(bio: dict, raw_signals: list[str], target_final_count: int
 
 
 # ══════════════════════════════════════════════
-# BRAND SOURCE URL MATCHING
+# EXECUTIVE SUMMARY GENERATOR
 # ──────────────────────────────────────────────
+# Reads the dashboard's aggregate numbers and writes a short, plain-
+# English summary a non-technical exec/CEO can read in 10 seconds.
+# ══════════════════════════════════════════════
+
+def generate_executive_summary(
+    brand_name: str,
+    overview: dict,
+    geo_breakdown: dict,
+    engine_breakdown: dict,
+) -> str:
+    """
+    overview: {"visibility_score", "total_responses", "brand_mentioned",
+               "brand_cited", "top_competitors": [{"brand","mentions"}]}
+    geo_breakdown: {"IN": {"visibility_score", ...}, "AE": {...}, "GB": {...}}
+    engine_breakdown: {"gemini": {"visibility_score", ...}, "openai": {...}}
+    """
+    top_competitors = ", ".join(
+        c.get("brand", "") for c in (overview.get("top_competitors") or [])[:3]
+    ) or "none identified"
+
+    geo_lines = "\n".join(
+        f"- {geo}: {data.get('visibility_score', 0)}% visibility "
+        f"({data.get('mentioned', 0)}/{data.get('total', 0)} responses)"
+        for geo, data in (geo_breakdown or {}).items()
+    )
+
+    engine_lines = "\n".join(
+        f"- {engine}: {data.get('visibility_score', 0)}% visibility"
+        for engine, data in (engine_breakdown or {}).items()
+    )
+
+    prompt = f"""Write a 3-sentence executive summary of this brand's AI
+visibility data. Plain English, no jargon, as if briefing a CEO who has
+30 seconds. Be specific with numbers. Call out the weakest geography or
+engine by name if there's a meaningful gap. Mention top competitors if
+relevant.
+
+BRAND: {brand_name}
+Overall visibility score: {overview.get('visibility_score', 0)}%
+Total responses tested: {overview.get('total_responses', 0)}
+Top competitors appearing instead: {top_competitors}
+
+BY GEOGRAPHY:
+{geo_lines or 'No geo data available'}
+
+BY AI ENGINE:
+{engine_lines or 'No engine data available'}
+
+Return ONLY the 3-sentence summary as plain text. No preamble, no
+markdown, no bullet points -- just the paragraph."""
+
+    try:
+        summary = call_gemini(
+            prompt,
+            "You are a sharp business analyst writing for a CEO with no patience for fluff."
+        )
+        return summary.strip()
+    except Exception as e:
+        print(f"❌ Error generating executive summary: {e}")
+        return "Summary unavailable — not enough data yet, or an error occurred generating it."
+
+
+
 # Given the list of citation URLs a grounded response actually used,
 # figure out which ones (if any) are specifically about the tracked
 # brand -- so "brand was mentioned" comes with "here's where."
@@ -674,10 +737,17 @@ def find_brand_source_urls(
     brand_name: str,
     brand_aliases: list[str] = None,
     grounding_supports: list[dict] = None,
+    brand_was_mentioned: bool = False,
 ) -> list[dict]:
     """
     Finds the citation(s) that actually back the SENTENCE mentioning the
     brand, not just any source the response happened to use.
+
+    brand_was_mentioned MUST be passed as True only when parse_response()
+    already confirmed the brand was mentioned in this response -- this
+    gates tier 4 below so unconfirmed/possible sources are never shown
+    on responses where the brand wasn't mentioned at all (that must stay
+    a clean empty result, not a guess).
 
     Priority order:
     1. SEGMENT-LEVEL MATCH (most accurate) -- if grounding_supports is
@@ -693,8 +763,13 @@ def find_brand_source_urls(
        and brand_name appears within that character range, it's a match.
     3. DOMAIN/TITLE FALLBACK -- if neither of the above applies (or
        finds nothing), fall back to checking whether the citation's own
-       domain or title contains the brand's domain/name. Weakest signal,
-       but better than nothing when structured data isn't available.
+       domain or title contains the brand's domain/name.
+    4. UNCONFIRMED FALLBACK -- only reached if brand_was_mentioned=True
+       AND nothing above found anything. Rather than showing nothing
+       (which reads as "no proof exists"), surface up to 3 of the real
+       citations this response used, honestly labeled "unconfirmed"
+       rather than a confirmed exact match. Never applied when the
+       brand wasn't actually mentioned.
     """
     if not citation_urls:
         return []
@@ -768,7 +843,80 @@ def find_brand_source_urls(
                 "matched_by": "domain" if domain_match else "title",
             })
 
-    return matches
+    if matches:
+        return matches
+
+    # ── 4. Honest fallback: response WAS grounded and used real citations,
+    #      we just couldn't confidently pin one to the exact brand-mentioning
+    #      sentence (e.g. Gemini didn't return grounding_supports for this
+    #      response, or referred to the brand indirectly/"the brand" instead
+    #      of by name in that segment). Rather than showing nothing -- which
+    #      reads as "no proof exists" -- surface what WAS used, honestly
+    #      labeled as unconfirmed rather than a confirmed exact match.
+    #      ONLY runs if the brand was actually confirmed mentioned -- never
+    #      shows sources on a response where the brand wasn't mentioned.
+    if brand_was_mentioned and citation_urls:
+        return [{
+            "title": c.get("title", ""),
+            "url": c.get("uri") or c.get("url", ""),
+            "matched_by": "unconfirmed",
+        } for c in citation_urls[:3]]  # cap at 3 to avoid dumping every source
+
+    return []
+
+
+# ══════════════════════════════════════════════
+# EXECUTIVE SUMMARY GENERATOR
+# ──────────────────────────────────────────────
+# Reads the aggregated dashboard numbers (visibility score, geo/engine
+# breakdown, top competitors) and writes a short plain-English summary --
+# the kind of thing a brand manager could read in 10 seconds instead of
+# scanning 4 charts.
+# ══════════════════════════════════════════════
+
+def generate_executive_summary(
+    brand_name: str,
+    overview: dict,
+    by_geo: dict,
+    by_engine: dict,
+) -> str:
+    """
+    overview: {"visibility_score": .., "total_responses": .., "top_competitors": [...]}
+    by_geo: {"IN": {"visibility_score": ..}, "AE": {...}, "GB": {...}}
+    by_engine: {"gemini": {"visibility_score": ..}, "openai": {...}}
+    Returns a 3-4 sentence plain-English summary.
+    """
+    prompt = f"""You are writing a short executive summary for a brand
+manager, based on this AI visibility data for "{brand_name}".
+
+OVERALL VISIBILITY SCORE: {overview.get('visibility_score', 0)}%
+TOTAL RESPONSES ANALYZED: {overview.get('total_responses', 0)}
+TOP COMPETING BRANDS MENTIONED INSTEAD: {overview.get('top_competitors', [])}
+
+VISIBILITY BY COUNTRY: {by_geo}
+VISIBILITY BY AI ENGINE: {by_engine}
+
+Write a 3-4 sentence plain-English summary a busy brand manager could
+read in 10 seconds. Rules:
+- Lead with the headline number (overall visibility score).
+- Call out the weakest geography or engine by name if there's a clear gap.
+- Name the top 1-2 competing brands if the data shows any.
+- No jargon, no bullet points -- just clear sentences.
+- If data is too sparse to say something meaningful (e.g. very few
+  responses), say so honestly instead of inventing a confident-sounding
+  summary.
+
+Return ONLY the summary text, no preamble, no markdown formatting."""
+
+    try:
+        summary = call_gemini(
+            prompt,
+            "You are a concise business analyst. Return only the summary text, nothing else."
+        )
+        return summary.strip()
+    except Exception as e:
+        print(f"❌ Error generating executive summary: {e}")
+        return "Summary unavailable — not enough data yet or a temporary error occurred."
 
 
 # ══════════════════════════════════════════════

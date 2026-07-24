@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import ResultsTable from './ResultsTable';
 
 const API = 'http://127.0.0.1:8000/api';
 
@@ -282,60 +283,7 @@ function PipelineFlow({ brand, onResultsReady }) {
                         </table>
                     </div>
 
-                    {results && (
-                        <div className="card">
-                            <h2>📊 Gemini Results</h2>
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Prompt</th>
-                                        <th>Mentioned?</th>
-                                        <th>Cited?</th>
-                                        <th>Form</th>
-                                        <th>Source</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {results.map((r, i) => (
-                                        <tr key={i}>
-                                            <td style={{ maxWidth: 300 }}>{r.prompt_text}</td>
-                                            <td>
-                                                <span className={`status ${r.brand_mentioned ? 'status-complete' : 'status-failed'}`}>
-                                                    {r.brand_mentioned ? '✅ Yes' : '❌ No'}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <span className={`status ${r.brand_cited ? 'status-complete' : 'status-failed'}`}>
-                                                    {r.brand_cited ? '✅ Yes' : '❌ No'}
-                                                </span>
-                                            </td>
-                                            <td>{r.mention_form}</td>
-                                            <td>
-                                                {r.brand_source_urls && r.brand_source_urls.length > 0 ? (
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                                        {r.brand_source_urls.map((s, j) => (
-                                                            <a
-                                                                key={j}
-                                                                href={s.url}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                style={{ fontSize: 12, color: '#e94560' }}
-                                                                title={s.title || s.url}
-                                                            >
-                                                                {s.title ? (s.title.length > 30 ? s.title.slice(0, 30) + '…' : s.title) : 'View source'}
-                                                            </a>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    <span style={{ color: '#bbb', fontSize: 12 }}>—</span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                    <ResultsTable results={results} title="📊 Gemini Results" />
                 </div>
             )}
         </div>

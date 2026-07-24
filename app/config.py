@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     SERP_API_KEY:   str = ""
     GEMINI_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
-
+    API_SECRET_KEY: str = ""
     # Model names — as instructed by JD: Gemini 3.1 Flash-Lite + GPT-5.4 Mini
     GEMINI_MODEL: str = "gemini-3.1-flash-lite"
     OPENAI_MODEL: str = "gpt-5.4-mini"

@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -101,6 +100,43 @@ def get_brand(brand_id: str, db: Session = Depends(get_db)):
         "bio":            brand.bio,
         "bio_updated_at": brand.bio_updated_at,
         "active_geos":    brand.active_geos,
+    }
+
+
+class ScheduleRequest(BaseModel):
+    auto_run_enabled: bool
+    auto_run_day:      str  # "monday".."sunday"
+
+@router.get("/brands/{brand_id}/schedule")
+def get_schedule(brand_id: str, db: Session = Depends(get_db)):
+    """Get current auto-run schedule settings for a brand."""
+    brand = db.query(Brand).filter(Brand.id == brand_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+    return {
+        "auto_run_enabled": brand.auto_run_enabled,
+        "auto_run_day":     brand.auto_run_day,
+        "last_auto_run":    brand.last_auto_run,
+    }
+
+@router.post("/brands/{brand_id}/schedule")
+def set_schedule(brand_id: str, req: ScheduleRequest, db: Session = Depends(get_db)):
+    """Enable/disable and configure automatic weekly pipeline runs."""
+    brand = db.query(Brand).filter(Brand.id == brand_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+
+    valid_days = {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
+    if req.auto_run_day.lower() not in valid_days:
+        raise HTTPException(status_code=400, detail=f"auto_run_day must be one of {valid_days}")
+
+    brand.auto_run_enabled = req.auto_run_enabled
+    brand.auto_run_day     = req.auto_run_day.lower()
+    db.commit()
+
+    return {
+        "auto_run_enabled": brand.auto_run_enabled,
+        "auto_run_day":     brand.auto_run_day,
     }
 
 
@@ -240,6 +276,74 @@ def get_by_engine(brand_id: str, db: Session = Depends(get_db)):
     }
 
 
+@router.get("/dashboard/{brand_id}/summary")
+def get_executive_summary(brand_id: str, db: Session = Depends(get_db)):
+    """
+    AI-generated plain-English executive summary of the brand's
+    visibility, built from the same data as the overview/geo/engine
+    endpoints -- reads like something a brand manager could skim in
+    10 seconds instead of scanning multiple charts.
+    """
+    brand = db.query(Brand).filter(Brand.id == brand_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+
+    responses = db.query(Response).filter(Response.brand_id == brand_id).all()
+    if not responses:
+        return {"summary": "No data yet — run the pipeline first to generate a summary."}
+
+    total = len(responses)
+    mentioned = sum(1 for r in responses if r.brand_mentioned)
+    visibility_score = round((mentioned / total) * 100, 1) if total > 0 else 0
+
+    competitor_counts = {}
+    for r in responses:
+        for comp in (r.competing_brands or []):
+            name = comp.get("brand_name", "")
+            if name:
+                competitor_counts[name] = competitor_counts.get(name, 0) + 1
+    top_competitors = sorted(
+        [{"brand": k, "mentions": v} for k, v in competitor_counts.items()],
+        key=lambda x: x["mentions"], reverse=True
+    )[:5]
+
+    geo_data = {}
+    for r in responses:
+        geo_data.setdefault(r.geo, {"total": 0, "mentioned": 0})
+        geo_data[r.geo]["total"] += 1
+        if r.brand_mentioned:
+            geo_data[r.geo]["mentioned"] += 1
+    by_geo = {
+        geo: round((d["mentioned"] / d["total"]) * 100, 1) if d["total"] > 0 else 0
+        for geo, d in geo_data.items()
+    }
+
+    engine_data = {}
+    for r in responses:
+        engine_data.setdefault(r.engine, {"total": 0, "mentioned": 0})
+        engine_data[r.engine]["total"] += 1
+        if r.brand_mentioned:
+            engine_data[r.engine]["mentioned"] += 1
+    by_engine = {
+        engine: round((d["mentioned"] / d["total"]) * 100, 1) if d["total"] > 0 else 0
+        for engine, d in engine_data.items()
+    }
+
+    from app.services.claude_service import generate_executive_summary
+    summary_text = generate_executive_summary(
+        brand_name=brand.name,
+        overview={
+            "visibility_score": visibility_score,
+            "total_responses": total,
+            "top_competitors": [c["brand"] for c in top_competitors],
+        },
+        by_geo=by_geo,
+        by_engine=by_engine,
+    )
+
+    return {"summary": summary_text}
+
+
 @router.get("/dashboard/{brand_id}/by-intent")
 def get_by_intent(brand_id: str, db: Session = Depends(get_db)):
     """Visibility breakdown by intent cluster."""
@@ -357,16 +461,18 @@ async def fire_selected_prompts(
                     s.get("uri") or s.get("url", "")
                     for s in fired.get("source_urls", [])
                 ]
+
+                # Parse the response
+                parsed = parse_response(raw, brand_name, brand_aliases)
+
                 brand_source_urls = find_brand_source_urls(
                     fired.get("source_urls", []),
                     brand.domain,
                     brand_name,
                     brand_aliases=brand_aliases,
                     grounding_supports=fired.get("grounding_supports", []),
+                    brand_was_mentioned=parsed.get("brand_mentioned", False),
                 )
-
-                # Parse the response
-                parsed = parse_response(raw, brand_name, brand_aliases)
 
                 # Save to DB
                 response_record = Response(

@@ -51,6 +51,11 @@ class Brand(Base):
     active_geos    = Column(JSON, default=["IN", "AE", "GB"])
     created_at     = Column(DateTime, default=datetime.utcnow)
 
+    # Auto-run scheduling
+    auto_run_enabled = Column(Boolean, default=False)
+    auto_run_day     = Column(String, default="monday")  # monday..sunday
+    last_auto_run    = Column(DateTime, nullable=True)
+
     client  = relationship("Client", back_populates="brands")
     prompts = relationship("Prompt", back_populates="brand")
     runs    = relationship("Run", back_populates="brand")

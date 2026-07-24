@@ -26,6 +26,15 @@ def discover_brand_pages(domain: str) -> list[dict]:
         )
         data = response.json()
 
+        # SerpAPI returns an "error" field (no organic_results at all) when
+        # something's wrong -- quota exhausted, invalid key, malformed query,
+        # etc. Without this check, that silently looks like "0 pages found"
+        # with no indication of why, which wastes time debugging the wrong
+        # thing (crawler/domain) instead of the real cause (the API call).
+        if "error" in data:
+            print(f"❌ SerpAPI returned an error for '{domain}': {data['error']}")
+            return []
+
         pages = []
         for result in data.get("organic_results", []):
             url   = result.get("link", "")
