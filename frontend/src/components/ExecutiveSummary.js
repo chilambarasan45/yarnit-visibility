@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 
-const API = 'http://127.0.0.1:8000/api';
 
 function ExecutiveSummary({ brandId }) {
   const [summary, setSummary] = useState('');

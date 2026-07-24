@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer, ReferenceLine, Legend
 } from 'recharts';
 
-const API = 'http://127.0.0.1:8000/api';
 
 function TrendChart({ brandId }) {
     const [data, setData]       = useState([]);

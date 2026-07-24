@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../api';
 import ResultsTable from './ResultsTable';
 
-const API = 'http://127.0.0.1:8000/api';
 
 const STEPS = [
     { id: 1, label: 'Crawl + Extract BIO'  },

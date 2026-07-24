@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-const API = 'http://127.0.0.1:8000/api';
 
 function Competitors({ brandId }) {
   const [data, setData]       = useState(null);

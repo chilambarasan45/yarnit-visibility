@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-const API = 'http://127.0.0.1:8000/api';
 const COLORS = ['#e94560', '#1a1a2e', '#4caf50', '#ff9800', '#9c27b0'];
 
 function Overview({ brandId }) {

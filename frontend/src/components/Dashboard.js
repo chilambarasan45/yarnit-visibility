@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../api';
 import Overview from './Overview';
 import GeoBreakdown from './GeoBreakdown';
 import EngineBreakdown from './EngineBreakdown';
@@ -9,7 +9,6 @@ import PipelineFlow from './PipelineFlow';
 import RunHistory from './RunHistory';
 import TrendChart from './TrendChart';
 import ExecutiveSummary from './ExecutiveSummary';
-const API = 'http://127.0.0.1:8000/api';
 
 function Dashboard({ brand, onBack }) {
   const [activeTab, setActiveTab]   = useState('pipeline');

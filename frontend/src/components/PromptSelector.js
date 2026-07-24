@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 import ResultsTable from './ResultsTable';
 
-const API = 'http://127.0.0.1:8000/api';
 
 function PromptSelector({ brandId }) {
   const [prompts, setPrompts]   = useState([]);
