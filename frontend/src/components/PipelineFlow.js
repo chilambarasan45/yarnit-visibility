@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import api from '../api';
 import ResultsTable from './ResultsTable';
-
+import axios from 'axios';
 
 const STEPS = [
     { id: 1, label: 'Crawl + Extract BIO'  },

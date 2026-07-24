@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
+import axios from 'axios';
 
 const GEO_NAMES = { IN: '🇮🇳 India', AE: '🇦🇪 UAE', GB: '🇬🇧 UK' };
 

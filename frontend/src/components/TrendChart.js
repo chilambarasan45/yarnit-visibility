@@ -4,7 +4,7 @@ import {
     LineChart, Line, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer, ReferenceLine, Legend
 } from 'recharts';
-
+import axios from 'axios';
 
 function TrendChart({ brandId }) {
     const [data, setData]       = useState([]);
