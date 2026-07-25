@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
 import api from '../api';
+import {
     LineChart, Line, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer, ReferenceLine, Legend
 } from 'recharts';
