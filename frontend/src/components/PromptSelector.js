@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import api from '../api';
 import ResultsTable from './ResultsTable';
 import api from '../api';
-
 function PromptSelector({ brandId }) {
   const [prompts, setPrompts]   = useState([]);
   const [selected, setSelected] = useState([]);

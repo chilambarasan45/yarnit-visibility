@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import api from '../api';
 import {
+import api from '../api';
     LineChart, Line, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer, ReferenceLine, Legend
 } from 'recharts';
-import api from '../api';
-
 function TrendChart({ brandId }) {
     const [data, setData]       = useState([]);
     const [loading, setLoading] = useState(true);

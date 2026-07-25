@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-
-
 function RunHistory({ brandId }) {
   const [runs, setRuns]       = useState([]);
   const [loading, setLoading] = useState(true);

@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import api from '../api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import api from '../api';
-
 function EngineBreakdown({ brandId }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);

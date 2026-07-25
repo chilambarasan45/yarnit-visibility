@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
-import api from '../api';
 import ResultsTable from './ResultsTable';
 import api from '../api';
-
 const STEPS = [
     { id: 1, label: 'Crawl + Extract BIO'  },
     { id: 2, label: 'Review BIO'           },

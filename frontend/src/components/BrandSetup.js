@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import api from '../api';
-
-
 function BrandSetup({ onBrandSelected }) {
   const [clients, setClients]       = useState([]);
   const [brands, setBrands]         = useState([]);
