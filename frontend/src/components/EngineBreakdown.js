@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import axios from 'axios';
+import api from '../api';
 
 function EngineBreakdown({ brandId }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get(`${API}/dashboard/${brandId}/by-engine`)
+    api.get(`/dashboard/${brandId}/by-engine`)
       .then(res => { setData(res.data); setLoading(false); })
       .catch(() => setLoading(false));
   }, [brandId]);

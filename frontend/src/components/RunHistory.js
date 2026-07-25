@@ -13,7 +13,7 @@ function RunHistory({ brandId }) {
   const fetchRuns = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API}/pipeline/runs/${brandId}`);
+      const res = await api.get(`/pipeline/runs/${brandId}`);
       setRuns(res.data);
     } catch (e) {
       console.error('Error fetching runs:', e);

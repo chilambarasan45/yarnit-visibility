@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import axios from 'axios';
+import api from '../api';
 
 const GEO_NAMES = { IN: '🇮🇳 India', AE: '🇦🇪 UAE', GB: '🇬🇧 UK' };
 
@@ -11,7 +11,7 @@ function GeoBreakdown({ brandId }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get(`${API}/dashboard/${brandId}/by-geo`)
+    api.get(`/dashboard/${brandId}/by-geo`)
       .then(res => { setData(res.data); setLoading(false); })
       .catch(() => setLoading(false));
   }, [brandId]);

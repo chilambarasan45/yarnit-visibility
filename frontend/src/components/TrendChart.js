@@ -4,14 +4,14 @@ import {
     LineChart, Line, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer, ReferenceLine, Legend
 } from 'recharts';
-import axios from 'axios';
+import api from '../api';
 
 function TrendChart({ brandId }) {
     const [data, setData]       = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        axios.get(`${API}/dashboard/${brandId}/trend`)
+        api.get(`/dashboard/${brandId}/trend`)
             .then(res => { setData(res.data); setLoading(false); })
             .catch(() => setLoading(false));
     }, [brandId]);

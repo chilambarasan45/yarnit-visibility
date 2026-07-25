@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import ResultsTable from './ResultsTable';
-import axios from 'axios';
+import api from '../api';
 
 function PromptSelector({ brandId }) {
   const [prompts, setPrompts]   = useState([]);
@@ -18,7 +18,7 @@ function PromptSelector({ brandId }) {
   const fetchPrompts = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API}/brands/${brandId}/prompts`);
+      const res = await api.get(`/brands/${brandId}/prompts`);
       setPrompts(res.data);
     } catch (e) {
       setMessage('❌ No prompts yet — run the pipeline first.');
@@ -46,7 +46,7 @@ function PromptSelector({ brandId }) {
     setFiring(true);
     setMessage(`🔥 Firing ${selected.length} prompts at Gemini...`);
     try {
-      const res = await axios.post(`${API}/pipeline/fire-selected`, {
+      const res = await api.post(`/pipeline/fire-selected`, {
         brand_id:   brandId,
         prompt_ids: selected,
       });

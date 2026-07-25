@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import api from '../api';
 import ResultsTable from './ResultsTable';
-import axios from 'axios';
+import api from '../api';
 
 const STEPS = [
     { id: 1, label: 'Crawl + Extract BIO'  },
@@ -23,7 +23,7 @@ function PipelineFlow({ brand, onResultsReady }) {
         setLoading(true);
         setMessage('🔍 Crawling brand website and extracting BIO...');
         try {
-            const res = await axios.post(`${API}/pipeline/crawl-and-bio`, {
+            const res = await api.post(`/pipeline/crawl-and-bio`, {
                 brand_id: brand.id,
             });
             setBio(res.data.bio);
@@ -39,7 +39,7 @@ function PipelineFlow({ brand, onResultsReady }) {
         setLoading(true);
         setMessage('📝 Generating prompts from SERP signals...');
         try {
-            const res = await axios.post(`${API}/pipeline/generate-prompts`, {
+            const res = await api.post(`/pipeline/generate-prompts`, {
                 brand_id: brand.id,
             });
             setPrompts(res.data.prompts);
@@ -71,7 +71,7 @@ function PipelineFlow({ brand, onResultsReady }) {
         setLoading(true);
         setMessage(`🔥 Firing ${selected.length} prompts at Gemini...`);
         try {
-            const res = await axios.post(`${API}/pipeline/fire-selected`, {
+            const res = await api.post(`/pipeline/fire-selected`, {
                 brand_id:   brand.id,
                 prompt_ids: selected,
             });

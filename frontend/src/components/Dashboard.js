@@ -20,7 +20,7 @@ function Dashboard({ brand, onBack }) {
     setRunning(true);
     setRunMessage('🔄 Pipeline running... this may take several minutes.');
     try {
-      const res = await axios.post(`${API}/pipeline/run`, {
+      const res = await api.post(`/pipeline/run`, {
         brand_id: brand.id,
       });
       setRunResult(res.data);
@@ -121,7 +121,7 @@ function ScheduleSettings({ brandId }) {
   const fetchStatus = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API}/brands/${brandId}/schedule`);
+      const res = await api.get(`/brands/${brandId}/schedule`);
       setEnabled(res.data.auto_run_enabled || false);
       setDay(res.data.auto_run_day || 'monday');
     } catch (e) {
@@ -134,7 +134,7 @@ function ScheduleSettings({ brandId }) {
     setSaving(true);
     setMessage('');
     try {
-      await axios.post(`${API}/brands/${brandId}/schedule`, {
+      await api.post(`/brands/${brandId}/schedule`, {
         auto_run_enabled: newEnabled,
         auto_run_day: newDay,
       });

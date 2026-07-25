@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import axios from 'axios';
+import api from '../api';
 
 
 function BrandSetup({ onBrandSelected }) {
@@ -19,7 +19,7 @@ function BrandSetup({ onBrandSelected }) {
 
   const fetchClients = async () => {
     try {
-      const res = await axios.get(`${API}/clients`);
+      const res = await api.get(`/clients`);
       setClients(res.data);
     } catch (e) {
       console.error('Error fetching clients:', e);
@@ -28,7 +28,7 @@ function BrandSetup({ onBrandSelected }) {
 
   const fetchBrands = async () => {
     try {
-      const res = await axios.get(`${API}/brands`);
+      const res = await api.get(`/brands`);
       setBrands(res.data);
     } catch (e) {
       console.error('Error fetching brands:', e);
@@ -38,7 +38,7 @@ function BrandSetup({ onBrandSelected }) {
   const createClient = async () => {
     if (!newClient.trim()) return;
     try {
-      await axios.post(`${API}/clients`, { name: newClient });
+      await api.post(`/clients`, { name: newClient });
       setNewClient('');
       setMessage('✅ Client created!');
       fetchClients();
@@ -54,7 +54,7 @@ function BrandSetup({ onBrandSelected }) {
     }
     setLoading(true);
     try {
-      await axios.post(`${API}/brands`, {
+      await api.post(`/brands`, {
         name:      newBrand.name,
         domain:    newBrand.domain,
         client_id: newBrand.client_id,

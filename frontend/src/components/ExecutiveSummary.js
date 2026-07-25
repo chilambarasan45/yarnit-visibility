@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 
-import axios from 'axios';
+import api from '../api';
 function ExecutiveSummary({ brandId }) {
   const [summary, setSummary] = useState('');
   const [loading, setLoading] = useState(true);
@@ -13,7 +13,7 @@ function ExecutiveSummary({ brandId }) {
   const fetchSummary = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API}/dashboard/${brandId}/summary`);
+      const res = await api.get(`/dashboard/${brandId}/summary`);
       setSummary(res.data.summary);
     } catch (e) {
       setSummary('Could not load summary — check terminal for details.');
