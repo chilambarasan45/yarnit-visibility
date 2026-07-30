@@ -547,28 +547,63 @@ async def crawl_and_extract_bio(
     if not brand:
         raise HTTPException(status_code=404, detail="Brand not found")
 
+    # Pull out the plain values we need, then release this connection
+    # back to the pool BEFORE the long-running crawl starts.
+    #
+    # Why: the crawl below can take 30-90+ seconds (10+ sequential page
+    # loads, several via a headless browser with multi-second scroll/
+    # wait delays). If we kept this DB session open the whole time, the
+    # connection sits idle for that entire window -- and cloud Postgres
+    # (Render, etc.) commonly closes idle SSL connections in the
+    # background. SQLAlchemy's pool_pre_ping only re-validates a
+    # connection at the moment it's freshly checked out from the pool --
+    # since this one was checked out once at the start of the request
+    # and never returned, pre_ping never got a chance to catch that it
+    # had gone stale, and the final db.commit() failed with
+    # "SSL connection has been closed unexpectedly".
+    #
+    # Closing here returns the connection to the pool immediately, and
+    # opening a NEW session below (right before the write) forces a
+    # fresh checkout -- which pool_pre_ping WILL validate, transparently
+    # reconnecting if needed.
+    brand_id     = str(brand.id)
+    brand_domain = brand.domain
+    brand_name   = brand.name
+    db.close()
+
     from app.services.serp_service import crawl_brand
     from app.services.claude_service import extract_bio
+    from app.models.database import SessionLocal
     from datetime import datetime
 
-    print(f"\n🔍 Stage A: Crawling {brand.domain}...")
+    print(f"\n🔍 Stage A: Crawling {brand_domain}...")
 
-    corpus = crawl_brand(brand.domain)
+    corpus = crawl_brand(brand_domain)
     if not corpus:
         raise HTTPException(status_code=500, detail="Crawl failed — not enough pages found")
 
-    bio = extract_bio(corpus, brand.domain)
+    bio = extract_bio(corpus, brand_domain)
     if not bio:
         raise HTTPException(status_code=500, detail="BIO extraction failed")
 
-    brand.bio            = bio
-    brand.bio_updated_at = datetime.utcnow()
-    db.commit()
+    # Fresh session for the write -- see note above for why this can't
+    # just reuse the `db` session injected at the top of the request.
+    write_db = SessionLocal()
+    try:
+        brand_row = write_db.query(Brand).filter(Brand.id == req.brand_id).first()
+        if not brand_row:
+            raise HTTPException(status_code=404, detail="Brand not found")
 
-    print(f"✅ BIO extracted and saved for {brand.domain}")
+        brand_row.bio            = bio
+        brand_row.bio_updated_at = datetime.utcnow()
+        write_db.commit()
+    finally:
+        write_db.close()
+
+    print(f"✅ BIO extracted and saved for {brand_domain}")
     return {
-        "brand_id":   str(brand.id),
-        "brand_name": brand.name,
+        "brand_id":   brand_id,
+        "brand_name": brand_name,
         "bio":        bio,
     }
 
