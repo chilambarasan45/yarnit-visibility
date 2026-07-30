@@ -115,6 +115,15 @@ def crawl_page(url: str) -> dict:
         text = re.sub(r'\s+', ' ', text).strip()
 
         if len(text) < 100:
+            # This used to fail SILENTLY -- no print statement -- which is
+            # exactly why "0/30 crawled" was hard to diagnose for sites
+            # like this one. Now it tells you WHY: either the page really
+            # has almost no content, or (more likely for JS-heavy modern
+            # storefronts) the real content is rendered by JavaScript and
+            # our plain-HTML fetch only sees an empty page shell.
+            print(f"⚠️  Skipping {url} — only {len(text)} chars of real "
+                  f"content found (page may be JS-rendered, or blocked "
+                  f"content disguised as a 200 OK response)")
             return {"url": url, "text": "", "success": False}
 
         print(f"✅ Crawled {url} — {len(text)} characters")
