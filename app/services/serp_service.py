@@ -190,22 +190,33 @@ def _crawl_with_playwright(url: str) -> dict:
         from playwright.sync_api import sync_playwright
 
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page    = browser.new_page()
-
-            page.set_extra_http_headers({
-                "User-Agent": (
+            # A couple of launch args that avoid the most basic signals
+            # sites use to fingerprint headless Chrome specifically
+            # (as opposed to a real browser).
+            browser = p.chromium.launch(
+                headless=True,
+                args=["--disable-blink-features=AutomationControlled"],
+            )
+            context = browser.new_context(
+                user_agent=(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
                     "Chrome/120.0.0.0 Safari/537.36"
-                )
-            })
+                ),
+                viewport={"width": 1280, "height": 800},
+            )
+            page = context.new_page()
 
-            # Go to page and wait for the DOM to be ready
-            page.goto(url, timeout=20000, wait_until="domcontentloaded")
-
-            # Give client-side JS a moment to finish rendering
-            page.wait_for_timeout(2000)
+            # Wait for network activity to settle, not just the initial
+            # DOM -- catches content that loads via a slower follow-up
+            # API call rather than being present at first paint. Falls
+            # back to whatever loaded if the page never fully idles
+            # (some sites keep background polling alive forever).
+            try:
+                page.goto(url, timeout=20000, wait_until="networkidle")
+            except Exception:
+                page.goto(url, timeout=20000, wait_until="domcontentloaded")
+                page.wait_for_timeout(4000)
 
             html = page.content()
             browser.close()
@@ -225,8 +236,13 @@ def _crawl_with_playwright(url: str) -> dict:
         text = re.sub(r'\s+', ' ', text).strip()
 
         if len(text) < 100:
+            # DEBUG: print what was actually captured so we can tell
+            # apart "genuinely empty/still loading" from "this is a bot
+            # -detection / CAPTCHA / block page" -- the fix is completely
+            # different depending on which one it is.
             print(f"⚠️  Skipping {url} — only {len(text)} chars even via "
                   f"Playwright (page may be genuinely empty or blocking bots)")
+            print(f"    DEBUG raw text captured: {text!r}")
             return {"url": url, "text": "", "success": False}
 
         print(f"✅ Crawled {url} — {len(text)} characters (Playwright)")
