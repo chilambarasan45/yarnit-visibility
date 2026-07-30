@@ -8,9 +8,34 @@ from app.config import settings
 
 # ══════════════════════════════════════════════
 # DATABASE CONNECTION
+# ──────────────────────────────────────────────
+# pool_pre_ping + pool_recycle were added to fix:
+#   psycopg2.OperationalError: SSL connection has been closed unexpectedly
+#
+# This happened at the very end of long-running requests (e.g. the
+# crawl-and-bio pipeline, which does 10+ sequential page loads --
+# some via Playwright with multi-second scroll/wait delays -- before
+# ever touching the database). While that request is busy crawling,
+# the checked-out DB connection sits idle, and the DB server / a
+# network proxy in between (common on managed Postgres like Render's)
+# silently closes it. When the code finally tries db.commit() at the
+# end, SQLAlchemy hands it that now-dead connection and the write fails
+# even though nothing was wrong with the query itself.
+#
+#   pool_pre_ping=True  -- runs a lightweight "is this connection still
+#                          alive?" check before handing it to your code.
+#                          If it's dead, SQLAlchemy transparently opens
+#                          a fresh one instead of failing.
+#   pool_recycle=1800    -- proactively recycles connections older than
+#                          30 minutes, before the DB/proxy has a chance
+#                          to kill them from its side.
 # ══════════════════════════════════════════════
 
-engine = create_engine(settings.DATABASE_URL)
+engine = create_engine(
+    settings.DATABASE_URL,
+    pool_pre_ping=True,
+    pool_recycle=1800,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
