@@ -173,10 +173,21 @@ def _crawl_with_playwright(url: str) -> dict:
     Requires:
         pip install playwright
         playwright install chromium
+
+    IMPORTANT: Playwright's Sync API refuses to run in any thread that
+    already has an asyncio event loop running -- and FastAPI's request
+    handler thread always does. Calling sync_playwright() directly here
+    raises "Sync API inside the asyncio loop". The fix is to run the
+    actual browser work in a dedicated worker thread (via
+    ThreadPoolExecutor) that has no event loop of its own, and block
+    here until it finishes. This avoids rewriting the whole crawler
+    (crawl_page / crawl_brand) as async just for this one fallback.
     """
-    try:
+    from concurrent.futures import ThreadPoolExecutor
+    import re
+
+    def _run_sync_playwright() -> str:
         from playwright.sync_api import sync_playwright
-        import re
 
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
@@ -198,6 +209,11 @@ def _crawl_with_playwright(url: str) -> dict:
 
             html = page.content()
             browser.close()
+            return html
+
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            html = executor.submit(_run_sync_playwright).result(timeout=30)
 
         soup = BeautifulSoup(html, "html.parser")
 
