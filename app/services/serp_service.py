@@ -207,16 +207,21 @@ def _crawl_with_playwright(url: str) -> dict:
             )
             page = context.new_page()
 
-            # Wait for network activity to settle, not just the initial
-            # DOM -- catches content that loads via a slower follow-up
-            # API call rather than being present at first paint. Falls
-            # back to whatever loaded if the page never fully idles
-            # (some sites keep background polling alive forever).
-            try:
-                page.goto(url, timeout=20000, wait_until="networkidle")
-            except Exception:
-                page.goto(url, timeout=20000, wait_until="domcontentloaded")
-                page.wait_for_timeout(4000)
+            # NOTE: "networkidle" was dropped -- sites like this keep
+            # background analytics/tracking requests pinging forever,
+            # so the page never truly goes idle and the wait just times
+            # out (that's what caused the earlier empty-message errors).
+            # domcontentloaded + a fixed settle time is more reliable.
+            page.goto(url, timeout=20000, wait_until="domcontentloaded")
+            page.wait_for_timeout(3000)
+
+            # Many e-commerce category pages lazy-load the actual
+            # product grid only once it scrolls into view. Scroll down
+            # in a couple of steps and pause between each to give that
+            # lazy content a chance to fetch and render.
+            for _ in range(3):
+                page.evaluate("window.scrollBy(0, document.body.scrollHeight / 3)")
+                page.wait_for_timeout(1200)
 
             html = page.content()
             browser.close()
@@ -224,7 +229,10 @@ def _crawl_with_playwright(url: str) -> dict:
 
     try:
         with ThreadPoolExecutor(max_workers=1) as executor:
-            html = executor.submit(_run_sync_playwright).result(timeout=30)
+            # Raised from 30s -> 45s: scrolling + settle waits above take
+            # longer than the original fixed 2s did, so the old timeout
+            # was cutting things off mid-load on some pages.
+            html = executor.submit(_run_sync_playwright).result(timeout=45)
 
         soup = BeautifulSoup(html, "html.parser")
 
@@ -253,7 +261,11 @@ def _crawl_with_playwright(url: str) -> dict:
         }
 
     except Exception as e:
-        print(f"❌ Playwright error for {url}: {e}")
+        # concurrent.futures.TimeoutError (and a few others) stringify to
+        # an empty message, which is why earlier logs showed
+        # "Playwright error for <url>: " with nothing after the colon.
+        # Including the exception type makes those readable too.
+        print(f"❌ Playwright error for {url}: [{type(e).__name__}] {e}")
         return {"url": url, "text": "", "success": False}
 
 
