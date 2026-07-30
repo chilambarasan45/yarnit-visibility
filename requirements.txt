@@ -9,3 +9,4 @@ openai
 requests
 beautifulsoup4
 apscheduler
+playwright==1.61.0
