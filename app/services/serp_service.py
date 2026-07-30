@@ -70,6 +70,12 @@ def discover_brand_pages(domain: str) -> list[dict]:
 
 # ══════════════════════════════════════════════
 # STAGE 2 — PAGE CRAWL AND CONTENT EXTRACTION
+# ──────────────────────────────────────────────
+# Now tries a fast requests-based crawl first, and falls back to a
+# real headless browser (Playwright) if the page comes back looking
+# empty -- which is what happens on JS-rendered storefronts
+# (React/Next.js sites like The Souled Store) where the real content
+# never appears in the plain HTML response.
 # ══════════════════════════════════════════════
 
 def crawl_page(url: str) -> dict:
@@ -77,7 +83,23 @@ def crawl_page(url: str) -> dict:
     Fetches a single page and extracts clean text.
     Strips: navigation, footer, scripts, cookie banners.
     Keeps: headings, product descriptions, FAQs, reviews.
+
+    Strategy:
+      1. Try a fast requests + BeautifulSoup crawl.
+      2. If that returns too little text (likely a JS-rendered page),
+         fall back to Playwright, which runs a real headless browser
+         so JavaScript actually executes before we read the content.
     """
+    result = _crawl_with_requests(url)
+    if result["success"]:
+        return result
+
+    print(f"  🔄 Falling back to Playwright for: {url}")
+    return _crawl_with_playwright(url)
+
+
+def _crawl_with_requests(url: str) -> dict:
+    """Fast crawl using requests + BeautifulSoup (original Stage 2 logic)."""
     try:
         headers = {
             "User-Agent": (
@@ -121,12 +143,14 @@ def crawl_page(url: str) -> dict:
             # has almost no content, or (more likely for JS-heavy modern
             # storefronts) the real content is rendered by JavaScript and
             # our plain-HTML fetch only sees an empty page shell.
-            print(f"⚠️  Skipping {url} — only {len(text)} chars of real "
-                  f"content found (page may be JS-rendered, or blocked "
-                  f"content disguised as a 200 OK response)")
+            #
+            # Rather than giving up here, we return success=False so the
+            # caller (crawl_page) can retry this URL with Playwright.
+            print(f"⚠️  {url} — only {len(text)} chars via requests "
+                  f"(page may be JS-rendered) — will retry with Playwright")
             return {"url": url, "text": "", "success": False}
 
-        print(f"✅ Crawled {url} — {len(text)} characters")
+        print(f"✅ Crawled {url} — {len(text)} characters (requests)")
         return {
             "url":     url,
             "text":    text[:5000],
@@ -134,7 +158,70 @@ def crawl_page(url: str) -> dict:
         }
 
     except Exception as e:
-        print(f"❌ Error crawling {url}: {e}")
+        print(f"❌ Error crawling {url} with requests: {e}")
+        return {"url": url, "text": "", "success": False}
+
+
+def _crawl_with_playwright(url: str) -> dict:
+    """
+    Slower but powerful crawl using Playwright.
+    Actually runs a real headless browser so JavaScript executes,
+    then reads the fully-rendered HTML. Used as a fallback for
+    React/Next.js storefronts (e.g. The Souled Store) where a plain
+    requests.get() only sees an empty page shell.
+
+    Requires:
+        pip install playwright
+        playwright install chromium
+    """
+    try:
+        from playwright.sync_api import sync_playwright
+        import re
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page    = browser.new_page()
+
+            page.set_extra_http_headers({
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                )
+            })
+
+            # Go to page and wait for the DOM to be ready
+            page.goto(url, timeout=20000, wait_until="domcontentloaded")
+
+            # Give client-side JS a moment to finish rendering
+            page.wait_for_timeout(2000)
+
+            html = page.content()
+            browser.close()
+
+        soup = BeautifulSoup(html, "html.parser")
+
+        for tag in soup(["nav", "footer", "script", "style", "header",
+                         "aside", "iframe", "noscript", "form"]):
+            tag.decompose()
+
+        text = soup.get_text(separator=" ", strip=True)
+        text = re.sub(r'\s+', ' ', text).strip()
+
+        if len(text) < 100:
+            print(f"⚠️  Skipping {url} — only {len(text)} chars even via "
+                  f"Playwright (page may be genuinely empty or blocking bots)")
+            return {"url": url, "text": "", "success": False}
+
+        print(f"✅ Crawled {url} — {len(text)} characters (Playwright)")
+        return {
+            "url":     url,
+            "text":    text[:5000],
+            "success": True,
+        }
+
+    except Exception as e:
+        print(f"❌ Playwright error for {url}: {e}")
         return {"url": url, "text": "", "success": False}
 
 
